@@ -16,18 +16,52 @@
 
         <main>
             <form id="videoForm">
-                <!-- API Key -->
-                <div class="form-group">
-                    <label for="apiKey">
-                        <i class="ri-key-2-line"></i> Google Gemini API Key
-                    </label>
-                    <input
-                        type="password"
-                        id="apiKey"
-                        placeholder="AIza..."
-                        required
-                    >
-                    <small>스크립트 생성에 사용됩니다. 키는 서버에 저장되지 않습니다. <a href="https://aistudio.google.com/apikey" target="_blank">API 키 발급</a></small>
+                <!-- API Keys Section -->
+                <div class="api-keys-section">
+                    <h3><i class="ri-key-2-line"></i> API 키 설정</h3>
+
+                    <div class="api-grid">
+                        <!-- Gemini API Key -->
+                        <div class="form-group">
+                            <label for="geminiApiKey">
+                                Google Gemini API Key
+                            </label>
+                            <input
+                                type="password"
+                                id="geminiApiKey"
+                                placeholder="AIza..."
+                                required
+                            >
+                            <small><a href="https://aistudio.google.com/apikey" target="_blank">API 키 발급</a> (스크립트 생성)</small>
+                        </div>
+
+                        <!-- ElevenLabs API Key -->
+                        <div class="form-group">
+                            <label for="elevenlabsApiKey">
+                                ElevenLabs API Key
+                            </label>
+                            <input
+                                type="password"
+                                id="elevenlabsApiKey"
+                                placeholder="sk_..."
+                                required
+                            >
+                            <small><a href="https://elevenlabs.io/api" target="_blank">API 키 발급</a> (음성 합성)</small>
+                        </div>
+
+                        <!-- Pexels API Key -->
+                        <div class="form-group">
+                            <label for="pexelsApiKey">
+                                Pexels API Key <span class="optional">(선택)</span>
+                            </label>
+                            <input
+                                type="password"
+                                id="pexelsApiKey"
+                                placeholder="..."
+                            >
+                            <small><a href="https://www.pexels.com/api/" target="_blank">API 키 발급</a> (배경 이미지, 무료)</small>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Title -->
@@ -58,37 +92,66 @@
                 </div>
 
                 <!-- Options -->
-                <div class="options-grid">
-                    <div class="form-group">
-                        <label for="voice">
-                            <i class="ri-mic-line"></i> 음성 선택
-                        </label>
-                        <select id="voice">
-                            <option value="ko-KR-SunHiNeural">선희 (여성, 따뜻한 톤)</option>
-                            <option value="ko-KR-InJoonNeural">인준 (남성, 차분한 톤)</option>
-                            <option value="ko-KR-YuJinNeural">유진 (여성)</option>
-                            <option value="ko-KR-BongJinNeural">봉진 (남성)</option>
-                        </select>
-                    </div>
+                <div class="options-section">
+                    <h3><i class="ri-settings-3-line"></i> 옵션</h3>
 
-                    <div class="form-group">
-                        <label for="bgColor">
-                            <i class="ri-palette-line"></i> 배경색
-                        </label>
-                        <input type="color" id="bgColor" value="#1a1a2e">
-                    </div>
+                    <div class="options-grid">
+                        <div class="form-group">
+                            <label for="voice">
+                                <i class="ri-mic-line"></i> ElevenLabs 음성
+                            </label>
+                            <select id="voice">
+                                <optgroup label="다국어 (한국어 지원)">
+                                    <option value="Lily" selected>Lily (여성, 추천)</option>
+                                    <option value="Aria">Aria (여성)</option>
+                                    <option value="Roger">Roger (남성)</option>
+                                    <option value="Laura">Laura (여성)</option>
+                                    <option value="Charlie">Charlie (남성)</option>
+                                    <option value="George">George (남성)</option>
+                                    <option value="River">River (중성)</option>
+                                    <option value="Bill">Bill (남성)</option>
+                                </optgroup>
+                                <optgroup label="영어 전용">
+                                    <option value="Rachel">Rachel (여성, 차분)</option>
+                                    <option value="Antoni">Antoni (남성, 따뜻)</option>
+                                    <option value="Josh">Josh (남성, 깊은)</option>
+                                    <option value="Sam">Sam (남성, 내레이션)</option>
+                                </optgroup>
+                            </select>
+                        </div>
 
-                    <div class="form-group">
-                        <label for="textColor">
-                            <i class="ri-font-color"></i> 텍스트 색상
-                        </label>
-                        <input type="color" id="textColor" value="#ffffff">
+                        <div class="form-group">
+                            <label for="bgColor">
+                                <i class="ri-palette-line"></i> 배경색
+                            </label>
+                            <input type="color" id="bgColor" value="#1a1a2e">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="textColor">
+                                <i class="ri-font-color"></i> 텍스트 색상
+                            </label>
+                            <input type="color" id="textColor" value="#ffffff">
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="useBroll" checked>
+                                <span><i class="ri-image-line"></i> B-roll 이미지 사용</span>
+                            </label>
+                            <small>Pexels에서 관련 이미지를 자동으로 가져옵니다</small>
+                        </div>
                     </div>
                 </div>
 
                 <button type="submit" id="submitBtn" class="btn-primary">
                     <i class="ri-movie-2-line"></i> 영상 생성하기
                 </button>
+
+                <div class="info-box">
+                    <i class="ri-information-line"></i>
+                    <p>10분 영상 생성에는 약 3-5분이 소요됩니다. ElevenLabs 크레딧이 소진될 수 있으니 확인해주세요.</p>
+                </div>
             </form>
 
             <!-- Progress Section -->
@@ -99,6 +162,24 @@
                         <div class="progress-fill" id="progressFill"></div>
                     </div>
                     <p id="progressText">시작 중...</p>
+                    <div class="progress-steps">
+                        <div class="step" data-step="script">
+                            <i class="ri-file-text-line"></i>
+                            <span>스크립트</span>
+                        </div>
+                        <div class="step" data-step="image">
+                            <i class="ri-image-line"></i>
+                            <span>이미지</span>
+                        </div>
+                        <div class="step" data-step="audio">
+                            <i class="ri-volume-up-line"></i>
+                            <span>음성</span>
+                        </div>
+                        <div class="step" data-step="video">
+                            <i class="ri-movie-line"></i>
+                            <span>영상</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -140,6 +221,7 @@
 
         <footer>
             <p>Blog to YouTube Video Converter &copy; 2024</p>
+            <p class="credits">Powered by Gemini + ElevenLabs + Pexels + MoviePy</p>
         </footer>
     </div>
 

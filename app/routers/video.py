@@ -6,8 +6,9 @@ import uuid
 import os
 
 from app.services.script_generator import generate_script
-from app.services.tts_service import generate_audio
+from app.services.tts_service import generate_audio_chunked
 from app.services.video_creator import create_video
+from app.services.image_service import get_images_for_script
 
 router = APIRouter()
 
@@ -15,10 +16,13 @@ router = APIRouter()
 class BlogToVideoRequest(BaseModel):
     blog_content: str
     title: Optional[str] = "YouTube Video"
-    voice: Optional[str] = "ko-KR-SunHiNeural"
+    voice: Optional[str] = "Lily"  # ElevenLabs 음성
     background_color: Optional[str] = "#1a1a2e"
     text_color: Optional[str] = "#ffffff"
     gemini_api_key: Optional[str] = None
+    elevenlabs_api_key: Optional[str] = None
+    pexels_api_key: Optional[str] = None
+    use_broll: Optional[bool] = True  # B-roll 이미지 사용 여부
 
 
 class VideoResponse(BaseModel):
@@ -56,34 +60,83 @@ async def generate_video(request: BlogToVideoRequest, background_tasks: Backgrou
 async def process_video_generation(video_id: str, request: BlogToVideoRequest):
     """백그라운드에서 영상 생성 처리"""
     try:
-        # Step 1: 스크립트 생성
-        progress_store[video_id] = {"status": "processing", "step": "스크립트 생성 중...", "progress": 20}
-
-        api_key = request.gemini_api_key or os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            progress_store[video_id] = {"status": "error", "step": "Gemini API 키가 필요합니다.", "progress": 0}
-            return
-
-        script = await generate_script(request.blog_content, request.title, api_key)
-        progress_store[video_id]["script"] = script
-
-        # Step 2: TTS 음성 생성
+        # Step 1: 스크립트 생성 (10%)
         progress_store[video_id] = {
-            **progress_store[video_id],
             "status": "processing",
-            "step": "음성 생성 중...",
-            "progress": 50
+            "step": "AI 스크립트 생성 중...",
+            "progress": 10
         }
 
-        audio_path = f"output/{video_id}_audio.mp3"
-        await generate_audio(script, audio_path, request.voice)
+        gemini_key = request.gemini_api_key or os.getenv("GEMINI_API_KEY")
+        if not gemini_key:
+            progress_store[video_id] = {
+                "status": "error",
+                "step": "Gemini API 키가 필요합니다.",
+                "progress": 0
+            }
+            return
 
-        # Step 3: 영상 합성
+        script = await generate_script(request.blog_content, request.title, gemini_key)
+        progress_store[video_id]["script"] = script
+
+        # Step 2: B-roll 이미지 다운로드 (25%)
+        broll_images = []
+        if request.use_broll:
+            progress_store[video_id] = {
+                **progress_store[video_id],
+                "status": "processing",
+                "step": "배경 이미지 다운로드 중...",
+                "progress": 25
+            }
+
+            pexels_key = request.pexels_api_key or os.getenv("PEXELS_API_KEY")
+            if pexels_key:
+                broll_images = await get_images_for_script(
+                    script=script,
+                    title=request.title,
+                    api_key=pexels_key,
+                    output_dir="output",
+                    images_per_section=1
+                )
+
+        # Step 3: TTS 음성 생성 (50%)
         progress_store[video_id] = {
             **progress_store[video_id],
             "status": "processing",
-            "step": "영상 합성 중...",
-            "progress": 80
+            "step": "ElevenLabs 음성 생성 중... (10분 분량)",
+            "progress": 40
+        }
+
+        elevenlabs_key = request.elevenlabs_api_key or os.getenv("ELEVENLABS_API_KEY")
+        if not elevenlabs_key:
+            progress_store[video_id] = {
+                "status": "error",
+                "step": "ElevenLabs API 키가 필요합니다.",
+                "progress": 0
+            }
+            return
+
+        audio_path = f"output/{video_id}_audio.mp3"
+        await generate_audio_chunked(
+            text=script,
+            output_path=audio_path,
+            voice=request.voice,
+            api_key=elevenlabs_key
+        )
+
+        progress_store[video_id] = {
+            **progress_store[video_id],
+            "status": "processing",
+            "step": "음성 생성 완료!",
+            "progress": 60
+        }
+
+        # Step 4: 영상 합성 (80%)
+        progress_store[video_id] = {
+            **progress_store[video_id],
+            "status": "processing",
+            "step": "영상 합성 중... (시간이 걸릴 수 있습니다)",
+            "progress": 70
         }
 
         video_path = f"output/{video_id}_video.mp4"
@@ -93,7 +146,8 @@ async def process_video_generation(video_id: str, request: BlogToVideoRequest):
             output_path=video_path,
             title=request.title,
             background_color=request.background_color,
-            text_color=request.text_color
+            text_color=request.text_color,
+            broll_images=broll_images
         )
 
         # 완료
@@ -106,9 +160,14 @@ async def process_video_generation(video_id: str, request: BlogToVideoRequest):
         }
 
     except Exception as e:
+        import traceback
+        error_detail = str(e)
+        print(f"영상 생성 오류: {error_detail}")
+        print(traceback.format_exc())
+
         progress_store[video_id] = {
             "status": "error",
-            "step": f"오류 발생: {str(e)}",
+            "step": f"오류 발생: {error_detail[:200]}",
             "progress": 0
         }
 
@@ -153,3 +212,28 @@ async def get_script(video_id: str):
         raise HTTPException(status_code=400, detail="Script not ready yet")
 
     return {"script": script}
+
+
+@router.get("/voices")
+async def get_voices():
+    """사용 가능한 ElevenLabs 음성 목록"""
+    return {
+        "multilingual": {
+            "Lily": "여성, 다국어 (추천)",
+            "Aria": "여성, 다국어",
+            "Roger": "남성, 다국어",
+            "Laura": "여성, 다국어",
+            "Charlie": "남성, 다국어",
+            "George": "남성, 다국어",
+            "River": "중성, 다국어",
+            "Bill": "남성, 다국어",
+        },
+        "english": {
+            "Rachel": "여성, 차분한 톤",
+            "Domi": "여성, 강한 톤",
+            "Bella": "여성, 부드러운 톤",
+            "Antoni": "남성, 따뜻한 톤",
+            "Josh": "남성, 깊은 톤",
+            "Sam": "남성, 내레이션",
+        }
+    }

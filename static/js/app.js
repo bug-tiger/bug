@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressSection = document.getElementById('progressSection');
     const progressFill = document.getElementById('progressFill');
     const progressText = document.getElementById('progressText');
+    const progressSteps = document.querySelectorAll('.progress-steps .step');
 
     const resultSection = document.getElementById('resultSection');
     const downloadBtn = document.getElementById('downloadBtn');
@@ -24,7 +25,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Character count
     blogContent.addEventListener('input', () => {
-        charCount.textContent = `${blogContent.value.length} 글자`;
+        const count = blogContent.value.length;
+        charCount.textContent = `${count.toLocaleString()} 글자`;
+
+        // 색상 변경 (권장: 1000-5000자)
+        if (count < 500) {
+            charCount.style.color = '#f59e0b';
+        } else if (count > 10000) {
+            charCount.style.color = '#ef4444';
+        } else {
+            charCount.style.color = '#10b981';
+        }
     });
 
     // Form submit
@@ -37,7 +48,10 @@ document.addEventListener('DOMContentLoaded', () => {
             voice: document.getElementById('voice').value,
             background_color: document.getElementById('bgColor').value,
             text_color: document.getElementById('textColor').value,
-            gemini_api_key: document.getElementById('apiKey').value
+            gemini_api_key: document.getElementById('geminiApiKey').value,
+            elevenlabs_api_key: document.getElementById('elevenlabsApiKey').value,
+            pexels_api_key: document.getElementById('pexelsApiKey').value,
+            use_broll: document.getElementById('useBroll').checked
         };
 
         try {
@@ -48,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
             progressSection.classList.remove('hidden');
             progressFill.style.width = '5%';
             progressText.textContent = '요청 전송 중...';
+            resetProgressSteps();
 
             const response = await fetch('/api/generate', {
                 method: 'POST',
@@ -80,6 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 progressFill.style.width = `${progress.progress}%`;
                 progressText.textContent = progress.step;
 
+                // Update progress steps
+                updateProgressSteps(progress.progress);
+
                 if (progress.status === 'completed') {
                     clearInterval(pollInterval);
                     showResult();
@@ -91,6 +109,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Polling error:', error);
             }
         }, 1000);
+    }
+
+    // Update progress steps visualization
+    function updateProgressSteps(progress) {
+        progressSteps.forEach(step => {
+            const stepName = step.dataset.step;
+            let threshold = 0;
+
+            switch (stepName) {
+                case 'script': threshold = 10; break;
+                case 'image': threshold = 25; break;
+                case 'audio': threshold = 40; break;
+                case 'video': threshold = 70; break;
+            }
+
+            if (progress >= threshold) {
+                step.classList.add('active');
+            }
+            if (progress >= threshold + 20) {
+                step.classList.add('completed');
+            }
+        });
+    }
+
+    // Reset progress steps
+    function resetProgressSteps() {
+        progressSteps.forEach(step => {
+            step.classList.remove('active', 'completed');
+        });
     }
 
     // Show result
@@ -141,12 +188,34 @@ document.addEventListener('DOMContentLoaded', () => {
         hideAllSections();
         form.reset();
         charCount.textContent = '0 글자';
+        charCount.style.color = '';
         currentVideoId = null;
         scriptPreview.classList.add('hidden');
+        resetProgressSteps();
     });
 
     // Retry
     retryBtn.addEventListener('click', () => {
         hideAllSections();
+    });
+
+    // API key localStorage persistence
+    const apiKeyFields = ['geminiApiKey', 'elevenlabsApiKey', 'pexelsApiKey'];
+
+    apiKeyFields.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        const savedValue = localStorage.getItem(fieldId);
+
+        if (savedValue) {
+            field.value = savedValue;
+        }
+
+        field.addEventListener('change', () => {
+            if (field.value) {
+                localStorage.setItem(fieldId, field.value);
+            } else {
+                localStorage.removeItem(fieldId);
+            }
+        });
     });
 });
