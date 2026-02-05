@@ -23,6 +23,33 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentVideoId = null;
     let pollInterval = null;
 
+    // Voice selection - show/hide custom voice ID input
+    const voiceSelect = document.getElementById('voice');
+    const customVoiceIdGroup = document.getElementById('customVoiceIdGroup');
+    const customVoiceId = document.getElementById('customVoiceId');
+
+    voiceSelect.addEventListener('change', () => {
+        if (voiceSelect.value === 'custom') {
+            customVoiceIdGroup.classList.remove('hidden');
+            customVoiceId.required = true;
+        } else {
+            customVoiceIdGroup.classList.add('hidden');
+            customVoiceId.required = false;
+        }
+    });
+
+    // Load saved custom voice ID
+    const savedCustomVoiceId = localStorage.getItem('customVoiceId');
+    if (savedCustomVoiceId) {
+        customVoiceId.value = savedCustomVoiceId;
+    }
+
+    customVoiceId.addEventListener('change', () => {
+        if (customVoiceId.value) {
+            localStorage.setItem('customVoiceId', customVoiceId.value);
+        }
+    });
+
     // Character count
     blogContent.addEventListener('input', () => {
         const count = blogContent.value.length;
@@ -42,10 +69,16 @@ document.addEventListener('DOMContentLoaded', () => {
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
+        // Get voice - use custom voice ID if selected
+        let selectedVoice = document.getElementById('voice').value;
+        if (selectedVoice === 'custom') {
+            selectedVoice = document.getElementById('customVoiceId').value;
+        }
+
         const data = {
             blog_content: document.getElementById('blogContent').value,
             title: document.getElementById('title').value,
-            voice: document.getElementById('voice').value,
+            voice: selectedVoice,
             background_color: document.getElementById('bgColor').value,
             text_color: document.getElementById('textColor').value,
             gemini_api_key: document.getElementById('geminiApiKey').value,
