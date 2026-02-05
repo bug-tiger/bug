@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blog to YouTube Video Converter</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="ri-youtube-fill"></i> Blog to YouTube</h1>
+            <p>블로그 글을 10분 유튜브 동영상으로 변환하세요</p>
+        </header>
+
+        <main>
+            <form id="videoForm">
+                <!-- API Key -->
+                <div class="form-group">
+                    <label for="apiKey">
+                        <i class="ri-key-2-line"></i> OpenAI API Key
+                    </label>
+                    <input
+                        type="password"
+                        id="apiKey"
+                        placeholder="sk-..."
+                        required
+                    >
+                    <small>스크립트 생성에 사용됩니다. 키는 서버에 저장되지 않습니다.</small>
+                </div>
+
+                <!-- Title -->
+                <div class="form-group">
+                    <label for="title">
+                        <i class="ri-text"></i> 영상 제목
+                    </label>
+                    <input
+                        type="text"
+                        id="title"
+                        placeholder="예: AI 시대, 개발자가 살아남는 법"
+                        required
+                    >
+                </div>
+
+                <!-- Blog Content -->
+                <div class="form-group">
+                    <label for="blogContent">
+                        <i class="ri-article-line"></i> 블로그 글 내용
+                    </label>
+                    <textarea
+                        id="blogContent"
+                        rows="12"
+                        placeholder="블로그 글 내용을 여기에 붙여넣기 하세요..."
+                        required
+                    ></textarea>
+                    <small id="charCount">0 글자</small>
+                </div>
+
+                <!-- Options -->
+                <div class="options-grid">
+                    <div class="form-group">
+                        <label for="voice">
+                            <i class="ri-mic-line"></i> 음성 선택
+                        </label>
+                        <select id="voice">
+                            <option value="ko-KR-SunHiNeural">선희 (여성, 따뜻한 톤)</option>
+                            <option value="ko-KR-InJoonNeural">인준 (남성, 차분한 톤)</option>
+                            <option value="ko-KR-YuJinNeural">유진 (여성)</option>
+                            <option value="ko-KR-BongJinNeural">봉진 (남성)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bgColor">
+                            <i class="ri-palette-line"></i> 배경색
+                        </label>
+                        <input type="color" id="bgColor" value="#1a1a2e">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="textColor">
+                            <i class="ri-font-color"></i> 텍스트 색상
+                        </label>
+                        <input type="color" id="textColor" value="#ffffff">
+                    </div>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn-primary">
+                    <i class="ri-movie-2-line"></i> 영상 생성하기
+                </button>
+            </form>
+
+            <!-- Progress Section -->
+            <div id="progressSection" class="hidden">
+                <div class="progress-card">
+                    <h3><i class="ri-loader-4-line spin"></i> 영상 생성 중...</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <p id="progressText">시작 중...</p>
+                </div>
+            </div>
+
+            <!-- Result Section -->
+            <div id="resultSection" class="hidden">
+                <div class="result-card">
+                    <h3><i class="ri-check-double-line"></i> 영상 생성 완료!</h3>
+
+                    <div class="result-actions">
+                        <a id="downloadBtn" href="#" class="btn-success" download>
+                            <i class="ri-download-2-line"></i> 영상 다운로드
+                        </a>
+                        <button id="viewScriptBtn" class="btn-secondary">
+                            <i class="ri-file-text-line"></i> 스크립트 보기
+                        </button>
+                        <button id="newVideoBtn" class="btn-outline">
+                            <i class="ri-add-line"></i> 새 영상 만들기
+                        </button>
+                    </div>
+
+                    <div id="scriptPreview" class="hidden">
+                        <h4>생성된 스크립트</h4>
+                        <pre id="scriptContent"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Error Section -->
+            <div id="errorSection" class="hidden">
+                <div class="error-card">
+                    <h3><i class="ri-error-warning-line"></i> 오류 발생</h3>
+                    <p id="errorText"></p>
+                    <button id="retryBtn" class="btn-primary">
+                        <i class="ri-refresh-line"></i> 다시 시도
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Blog to YouTube Video Converter &copy; 2024</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
