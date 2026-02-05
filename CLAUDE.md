@@ -37,7 +37,8 @@ app/
     ├── anthropic_script_generator.py  # Anthropic Claude 기반 대본 생성 (Scene 단위)
     ├── naver_crawler.py               # 네이버 블로그 크롤러
     ├── script_generator.py            # Google Gemini 기반 대본 생성
-    ├── tts_service.py                 # ElevenLabs TTS
+    ├── tts_service.py                 # ElevenLabs TTS (청크 분할 지원)
+    ├── image_generator.py             # OpenAI DALL-E 3 이미지 생성 (병렬 처리)
     ├── video_creator.py               # MoviePy 영상 합성
     └── image_service.py               # Pexels B-roll 이미지
 ```
@@ -57,8 +58,10 @@ app/
 
 `.env` 파일에 설정 필요:
 - `ANTHROPIC_API_KEY`: Anthropic Claude API (대본 생성)
+- `OPENAI_API_KEY`: OpenAI API (DALL-E 3 이미지 생성)
 - `GEMINI_API_KEY`: Google Gemini API (기존 대본 생성)
 - `ELEVENLABS_API_KEY`: ElevenLabs TTS API (음성 합성)
+- `ELEVENLABS_VOICE_ID`: ElevenLabs 음성 ID (클론 목소리 또는 기본 목소리)
 - `PEXELS_API_KEY`: Pexels API (B-roll 이미지, 선택사항)
 
 ## Key Design Patterns
