@@ -1,53 +1,85 @@
+import json
+import re
+from typing import List, Tuple
+
 import anthropic
-from typing import Tuple
+
+from app.schemas.script import Scene, ScriptResponse
 
 
-async def generate_script_with_anthropic(text: str, api_key: str) -> Tuple[str, str]:
+async def generate_script_with_anthropic(
+    text: str,
+    api_key: str,
+    target_duration_minutes: int = 5
+) -> ScriptResponse:
     """
     블로그 글을 유튜브 촬영용 대본으로 변환 (Anthropic Claude 사용)
+    5분 분량의 장면(Scene) 단위 대본 생성
 
     Args:
         text: 블로그 글 내용
         api_key: Anthropic API 키
+        target_duration_minutes: 목표 영상 길이 (분)
 
     Returns:
-        Tuple[str, str]: (제목, 대본 내용)
+        ScriptResponse: 장면 단위 대본 응답
     """
-
     client = anthropic.Anthropic(api_key=api_key)
 
-    prompt = f"""당신은 전문 유튜브 스크립트 작가입니다.
-아래 블로그 글을 유튜브 촬영용 대본으로 변환해주세요.
+    # 목표 글자 수 계산 (1분당 약 400자 기준)
+    target_characters = target_duration_minutes * 400
 
-## 대본 작성 규칙
+    prompt = f"""당신은 20년 차 전문의이자 100만 구독자 유튜버입니다.
+의학적 전문성을 유지하되, 이웃집 아저씨처럼 친근하게 설명해야 합니다.
 
-### 톤 & 스타일
-- **구어체**: 글을 읽는 것이 아니라 말하듯이 자연스럽게 작성
-- **전문적이면서도 친근한 톤**: 정확한 정보 전달 + 시청자와 대화하는 느낌
-- 짧은 문장 사용 (한 문장에 하나의 아이디어)
-- 전문 용어는 쉽게 풀어서 설명
+## 핵심 임무
+아래 블로그 글을 **{target_duration_minutes}분 분량(약 {target_characters}자)**의 유튜브 촬영용 대본으로 변환하세요.
 
-### 대본 구조 (오프닝-본론-클로징)
+## 분량 확장 규칙 (중요!)
+- 입력된 텍스트가 짧더라도 **반드시 {target_characters}자 이상**이 되도록 내용을 풍성하게 확장할 것
+- 관련 의학 지식, 환자 에피소드, 일상적 비유를 추가하여 내용 확장
+- 시청자가 공감할 수 있는 구체적인 상황 묘사 포함
 
-1. **[오프닝]** (약 30초~1분)
-   - 강렬한 훅(Hook)으로 시작: 질문, 놀라운 사실, 또는 공감대 형성
-   - 영상에서 다룰 내용 미리보기
-   - 시청자가 끝까지 봐야 하는 이유 제시
+## 대본 구조
+1. **오프닝** (30초, ~200자): 강렬한 훅으로 시작. 질문 또는 놀라운 사실
+2. **본론1** (~60초, ~400자): 핵심 개념 설명
+3. **본론2** (~60초, ~400자): 구체적 예시와 사례
+4. **본론3** (~60초, ~400자): 실천 방법 또는 주의사항
+5. **클로징** (30초, ~200자): 요약 + 병원 슬로건 + CTA
 
-2. **[본론]** (핵심 내용)
-   - 3~5개의 섹션으로 명확하게 구분
-   - 각 섹션마다 소제목 표시: [섹션 1: 제목]
-   - 구체적인 예시와 비유 활용
-   - 섹션 간 자연스러운 전환 멘트 포함
+## 톤 & 스타일
+- **구어체**: 말하듯이 자연스럽게 (예: "~거든요", "~잖아요", "사실은요")
+- **친근함**: 전문 용어는 쉽게 풀어서 설명
+- **짧은 문장**: 한 문장에 하나의 아이디어
 
-3. **[클로징]** (약 30초~1분)
-   - 핵심 내용 요약 (3줄 정리)
-   - 시청자에게 실천 가능한 액션 아이템 제안
-   - 구독, 좋아요, 댓글 유도 (자연스럽게)
+## 출력 형식 (매우 중요!)
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
 
-### 출력 형식
-첫 줄에 대본 제목을 작성하고, 빈 줄 후 대본 내용을 작성해주세요.
-제목은 유튜브 영상 제목으로 사용할 수 있도록 매력적이고 클릭하고 싶게 작성해주세요.
+```json
+{{
+  "title": "매력적인 유튜브 영상 제목",
+  "scenes": [
+    {{
+      "section_title": "오프닝",
+      "script_korean": "안녕하세요, 여러분! 오늘은...",
+      "image_prompt_english": "A friendly Korean doctor in white coat smiling at camera, modern clinic background, warm lighting, professional yet approachable atmosphere",
+      "estimated_duration": 30
+    }},
+    {{
+      "section_title": "본론1",
+      "script_korean": "자, 먼저 이것부터 알아볼까요?...",
+      "image_prompt_english": "Detailed medical illustration showing..., clean white background, educational style, high quality 3D render",
+      "estimated_duration": 60
+    }}
+  ]
+}}
+```
+
+## 이미지 프롬프트 작성 규칙
+- 영어로 작성
+- 구체적이고 묘사적으로 (카메라 앵글, 조명, 분위기 포함)
+- 의료 영상에 적합한 전문적이면서도 친근한 이미지
+- 예시: "A hyper-realistic close-up of a doctor's hands holding a stethoscope, warm soft lighting, blurred hospital background, professional medical photography style"
 
 ---
 
@@ -57,11 +89,11 @@ async def generate_script_with_anthropic(text: str, api_key: str) -> Tuple[str, 
 
 ---
 
-위 블로그 글을 유튜브 촬영용 대본으로 변환해주세요."""
+위 블로그 글을 {target_duration_minutes}분 분량의 유튜브 대본으로 변환하세요. JSON 형식으로만 응답하세요."""
 
     message = client.messages.create(
         model="claude-sonnet-4-20250514",
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[
             {"role": "user", "content": prompt}
         ]
@@ -69,9 +101,62 @@ async def generate_script_with_anthropic(text: str, api_key: str) -> Tuple[str, 
 
     response_text = message.content[0].text
 
-    # 제목과 본문 분리 (첫 줄 = 제목, 나머지 = 본문)
-    lines = response_text.strip().split("\n", 1)
-    title = lines[0].strip().lstrip("#").strip()  # '#' 제거 (마크다운 형식일 경우)
-    script_content = lines[1].strip() if len(lines) > 1 else ""
+    # JSON 파싱
+    parsed = _parse_json_response(response_text)
 
-    return title, script_content
+    # Scene 객체 생성
+    scenes = [
+        Scene(
+            section_title=scene["section_title"],
+            script_korean=scene["script_korean"],
+            image_prompt_english=scene["image_prompt_english"],
+            estimated_duration=scene["estimated_duration"]
+        )
+        for scene in parsed["scenes"]
+    ]
+
+    # 총 시간 및 글자 수 계산
+    total_duration = sum(scene.estimated_duration for scene in scenes)
+    total_characters = sum(len(scene.script_korean) for scene in scenes)
+
+    return ScriptResponse(
+        title=parsed["title"],
+        total_duration=total_duration,
+        total_characters=total_characters,
+        scenes=scenes
+    )
+
+
+def _parse_json_response(text: str) -> dict:
+    """Claude 응답에서 JSON 추출 및 파싱"""
+    # 코드 블록 안의 JSON 추출
+    json_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
+    if json_match:
+        json_str = json_match.group(1).strip()
+    else:
+        # 코드 블록 없이 JSON만 있는 경우
+        json_str = text.strip()
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"JSON 파싱 실패: {e}\n응답: {text[:500]}")
+
+
+# Legacy 함수 (기존 API 호환)
+async def generate_script_legacy(text: str, api_key: str) -> Tuple[str, str]:
+    """
+    기존 API 호환용 - 단순 제목과 대본 반환
+
+    Returns:
+        Tuple[str, str]: (제목, 대본 내용)
+    """
+    response = await generate_script_with_anthropic(text, api_key)
+
+    # Scene들을 하나의 대본으로 합침
+    script_content = "\n\n".join(
+        f"[{scene.section_title}]\n{scene.script_korean}"
+        for scene in response.scenes
+    )
+
+    return response.title, script_content
