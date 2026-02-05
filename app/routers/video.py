@@ -18,7 +18,7 @@ class BlogToVideoRequest(BaseModel):
     voice: Optional[str] = "ko-KR-SunHiNeural"
     background_color: Optional[str] = "#1a1a2e"
     text_color: Optional[str] = "#ffffff"
-    openai_api_key: Optional[str] = None
+    gemini_api_key: Optional[str] = None
 
 
 class VideoResponse(BaseModel):
@@ -59,9 +59,9 @@ async def process_video_generation(video_id: str, request: BlogToVideoRequest):
         # Step 1: 스크립트 생성
         progress_store[video_id] = {"status": "processing", "step": "스크립트 생성 중...", "progress": 20}
 
-        api_key = request.openai_api_key or os.getenv("OPENAI_API_KEY")
+        api_key = request.gemini_api_key or os.getenv("GEMINI_API_KEY")
         if not api_key:
-            progress_store[video_id] = {"status": "error", "step": "OpenAI API 키가 필요합니다.", "progress": 0}
+            progress_store[video_id] = {"status": "error", "step": "Gemini API 키가 필요합니다.", "progress": 0}
             return
 
         script = await generate_script(request.blog_content, request.title, api_key)

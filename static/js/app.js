@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
             voice: document.getElementById('voice').value,
             background_color: document.getElementById('bgColor').value,
             text_color: document.getElementById('textColor').value,
-            openai_api_key: document.getElementById('apiKey').value
+            gemini_api_key: document.getElementById('apiKey').value
         };
 
         try {
