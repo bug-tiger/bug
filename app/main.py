@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import os
 
 from app.routers import video
+from app.api import api_router
 
 load_dotenv()
 
@@ -22,6 +23,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 # Include routers
 app.include_router(video.router, prefix="/api", tags=["video"])
+app.include_router(api_router, tags=["script"])
 
 
 @app.get("/", response_class=HTMLResponse)
