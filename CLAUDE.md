@@ -38,8 +38,9 @@ app/
     ├── naver_crawler.py               # 네이버 블로그 크롤러
     ├── script_generator.py            # Google Gemini 기반 대본 생성
     ├── tts_service.py                 # ElevenLabs TTS (청크 분할 지원)
-    ├── image_generator.py             # OpenAI DALL-E 3 이미지 생성 (병렬 처리)
-    ├── video_creator.py               # MoviePy 영상 합성
+    ├── image_generator.py             # Leonardo AI 이미지 생성 (비동기 병렬 처리)
+    ├── video_engine.py                # MoviePy 영상 조립 (Ken Burns 줌 효과)
+    ├── video_creator.py               # MoviePy 영상 합성 (기존)
     └── image_service.py               # Pexels B-roll 이미지
 ```
 
@@ -58,7 +59,8 @@ app/
 
 `.env` 파일에 설정 필요:
 - `ANTHROPIC_API_KEY`: Anthropic Claude API (대본 생성)
-- `OPENAI_API_KEY`: OpenAI API (DALL-E 3 이미지 생성)
+- `LEONARDO_API_KEY`: Leonardo AI API (이미지 생성)
+- `LEONARDO_MODEL_ID`: Leonardo AI 모델 ID (선택사항, 기본값: Lightning XL)
 - `GEMINI_API_KEY`: Google Gemini API (기존 대본 생성)
 - `ELEVENLABS_API_KEY`: ElevenLabs TTS API (음성 합성)
 - `ELEVENLABS_VOICE_ID`: ElevenLabs 음성 ID (클론 목소리 또는 기본 목소리)
