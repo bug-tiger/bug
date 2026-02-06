@@ -5,10 +5,11 @@ from typing import Optional
 import uuid
 import os
 
-from app.services.script_generator import generate_script
+from app.services.anthropic_script_generator import generate_script_legacy
 from app.services.tts_service import generate_audio_chunked
 from app.services.video_creator import create_video
 from app.services.image_service import get_images_for_script
+from app.core.config import settings
 
 router = APIRouter()
 
@@ -19,7 +20,6 @@ class BlogToVideoRequest(BaseModel):
     voice: Optional[str] = "Lily"  # ElevenLabs 음성
     background_color: Optional[str] = "#1a1a2e"
     text_color: Optional[str] = "#ffffff"
-    gemini_api_key: Optional[str] = None
     elevenlabs_api_key: Optional[str] = None
     pexels_api_key: Optional[str] = None
     use_broll: Optional[bool] = True  # B-roll 이미지 사용 여부
@@ -67,16 +67,16 @@ async def process_video_generation(video_id: str, request: BlogToVideoRequest):
             "progress": 10
         }
 
-        gemini_key = request.gemini_api_key or os.getenv("GEMINI_API_KEY")
-        if not gemini_key:
+        anthropic_key = settings.ANTHROPIC_API_KEY
+        if not anthropic_key:
             progress_store[video_id] = {
                 "status": "error",
-                "step": "Gemini API 키가 필요합니다.",
+                "step": "ANTHROPIC_API_KEY가 .env 파일에 필요합니다.",
                 "progress": 0
             }
             return
 
-        script = await generate_script(request.blog_content, request.title, gemini_key)
+        title, script = await generate_script_legacy(request.blog_content, anthropic_key)
         progress_store[video_id]["script"] = script
 
         # Step 2: B-roll 이미지 다운로드 (25%)
@@ -89,7 +89,7 @@ async def process_video_generation(video_id: str, request: BlogToVideoRequest):
                 "progress": 25
             }
 
-            pexels_key = request.pexels_api_key or os.getenv("PEXELS_API_KEY")
+            pexels_key = request.pexels_api_key or settings.PEXELS_API_KEY
             if pexels_key:
                 broll_images = await get_images_for_script(
                     script=script,
@@ -107,7 +107,7 @@ async def process_video_generation(video_id: str, request: BlogToVideoRequest):
             "progress": 40
         }
 
-        elevenlabs_key = request.elevenlabs_api_key or os.getenv("ELEVENLABS_API_KEY")
+        elevenlabs_key = request.elevenlabs_api_key or settings.ELEVENLABS_API_KEY
         if not elevenlabs_key:
             progress_store[video_id] = {
                 "status": "error",
