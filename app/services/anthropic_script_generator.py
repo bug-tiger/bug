@@ -24,7 +24,7 @@ async def generate_script_with_anthropic(
     Returns:
         ScriptResponse: 장면 단위 대본 응답
     """
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.AsyncAnthropic(api_key=api_key)
 
     # 목표 글자 수 계산 (1분당 약 400자 기준)
     target_characters = target_duration_minutes * 400
@@ -91,7 +91,7 @@ async def generate_script_with_anthropic(
 
 위 블로그 글을 {target_duration_minutes}분 분량의 유튜브 대본으로 변환하세요. JSON 형식으로만 응답하세요."""
 
-    message = client.messages.create(
+    message = await client.messages.create(
         model="claude-sonnet-4-20250514",
         max_tokens=8192,
         messages=[
