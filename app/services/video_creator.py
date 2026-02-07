@@ -5,7 +5,6 @@ import os
 from moviepy.editor import (
     AudioFileClip,
     ColorClip,
-    TextClip,
     ImageClip,
     CompositeVideoClip,
     concatenate_videoclips,
@@ -13,6 +12,102 @@ from moviepy.editor import (
 )
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import numpy as np
+
+
+def create_text_image(
+    text: str,
+    fontsize: int = 40,
+    color: str = "#ffffff",
+    bg_color: tuple = None,
+    size: tuple = None,
+    align: str = "center"
+) -> np.ndarray:
+    """PIL을 사용하여 텍스트 이미지 생성 (ImageMagick 불필요)"""
+
+    # 색상 파싱
+    if isinstance(color, str):
+        color = color.lstrip('#')
+        text_color = tuple(int(color[i:i+2], 16) for i in (0, 2, 4))
+    else:
+        text_color = color
+
+    # 폰트 설정 (시스템 기본 폰트 사용)
+    try:
+        # Windows 한글 폰트
+        font = ImageFont.truetype("malgun.ttf", fontsize)
+    except:
+        try:
+            # macOS/Linux
+            font = ImageFont.truetype("/usr/share/fonts/truetype/nanum/NanumGothic.ttf", fontsize)
+        except:
+            try:
+                font = ImageFont.truetype("NanumGothic.ttf", fontsize)
+            except:
+                # 기본 폰트
+                font = ImageFont.load_default()
+
+    # 텍스트 크기 계산
+    dummy_img = Image.new('RGBA', (1, 1))
+    dummy_draw = ImageDraw.Draw(dummy_img)
+
+    # 멀티라인 텍스트 크기 계산
+    lines = text.split('\n')
+    line_heights = []
+    line_widths = []
+
+    for line in lines:
+        bbox = dummy_draw.textbbox((0, 0), line, font=font)
+        line_widths.append(bbox[2] - bbox[0])
+        line_heights.append(bbox[3] - bbox[1])
+
+    text_width = max(line_widths) if line_widths else 100
+    line_height = max(line_heights) if line_heights else fontsize
+    text_height = line_height * len(lines) + (len(lines) - 1) * 5  # 줄 간격
+
+    # 패딩 추가
+    padding = 20
+    img_width = size[0] if size else text_width + padding * 2
+    img_height = text_height + padding * 2
+
+    # 이미지 생성 (투명 배경)
+    if bg_color:
+        img = Image.new('RGBA', (img_width, img_height), (*bg_color, 255))
+    else:
+        img = Image.new('RGBA', (img_width, img_height), (0, 0, 0, 0))
+
+    draw = ImageDraw.Draw(img)
+
+    # 텍스트 그리기
+    y_offset = padding
+    for i, line in enumerate(lines):
+        bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = bbox[2] - bbox[0]
+
+        if align == "center":
+            x = (img_width - line_width) // 2
+        elif align == "right":
+            x = img_width - line_width - padding
+        else:
+            x = padding
+
+        draw.text((x, y_offset), line, font=font, fill=(*text_color, 255))
+        y_offset += line_height + 5
+
+    return np.array(img)
+
+
+def create_text_clip(
+    text: str,
+    fontsize: int = 40,
+    color: str = "#ffffff",
+    size: tuple = None,
+    align: str = "center",
+    duration: float = 1.0
+) -> ImageClip:
+    """PIL 기반 텍스트 클립 생성"""
+    text_img = create_text_image(text, fontsize, color, size=size, align=align)
+    clip = ImageClip(text_img, ismask=False).set_duration(duration)
+    return clip
 
 
 async def create_video(

@@ -1,5 +1,5 @@
 """
-Leonardo AI 이미지 생성 모듈
+Leonardo AI 이미지 생성 모듈 (스타일 일관성 적용)
 
 환경변수 설정:
 - LEONARDO_API_KEY: Leonardo AI API 키
@@ -14,7 +14,6 @@ Leonardo AI 이미지 생성 모듈
 
 import asyncio
 import os
-import time
 from typing import List, Optional
 
 import aiohttp
@@ -22,8 +21,36 @@ import aiohttp
 from app.schemas.script import Scene
 
 
+# ============================================================
+# 스타일 프리셋 (의학 콘텐츠 신뢰도 향상을 위한 일관된 화풍)
+# ============================================================
+
+STYLE_PREFIX = (
+    "Photorealistic medical imagery, cinematic lighting, 8k resolution, "
+    "clean composition, professional and trustworthy atmosphere, highly detailed, "
+)
+
+NEGATIVE_PROMPT = (
+    "text, watermark, ugly, deformed, cartoon, illustration, sketching, "
+    "horror, blood, gore, blurry, low quality, bad anatomy"
+)
+
+
+def build_styled_prompt(content_prompt: str) -> str:
+    """
+    스타일 프리셋을 적용한 최종 프롬프트 생성
+
+    Args:
+        content_prompt: 콘텐츠 설명 (영문)
+
+    Returns:
+        스타일이 적용된 최종 프롬프트
+    """
+    return f"{STYLE_PREFIX}{content_prompt}"
+
+
 class LeonardoImageGenerator:
-    """Leonardo AI 이미지 생성기 (비동기)"""
+    """Leonardo AI 이미지 생성기 (비동기, 스타일 일관성 적용)"""
 
     BASE_URL = "https://cloud.leonardo.ai/api/rest/v1"
 
@@ -47,7 +74,7 @@ class LeonardoImageGenerator:
         width: int = 1344,  # 16:9 비율 (유튜브 최적화)
         height: int = 768,
         num_images: int = 1,
-        prompt_magic: bool = True,
+        apply_style: bool = True,
         guidance_scale: float = 7.0
     ) -> str:
         """
@@ -58,19 +85,21 @@ class LeonardoImageGenerator:
             width: 이미지 너비 (기본 1344, 16:9 비율)
             height: 이미지 높이 (기본 768)
             num_images: 생성할 이미지 수 (기본 1)
-            prompt_magic: 프롬프트 자동 향상 (기본 True)
+            apply_style: 스타일 프리셋 적용 여부 (기본 True)
             guidance_scale: 프롬프트 충실도 (기본 7.0)
 
         Returns:
             str: 생성된 이미지 URL
         """
+        # 스타일 적용
+        final_prompt = build_styled_prompt(prompt) if apply_style else prompt
+
         # 1. 이미지 생성 요청
         generation_id = await self._request_generation(
-            prompt=prompt,
+            prompt=final_prompt,
             width=width,
             height=height,
             num_images=num_images,
-            prompt_magic=prompt_magic,
             guidance_scale=guidance_scale
         )
 
@@ -85,7 +114,6 @@ class LeonardoImageGenerator:
         width: int,
         height: int,
         num_images: int,
-        prompt_magic: bool,
         guidance_scale: float
     ) -> str:
         """이미지 생성 요청 후 generation_id 반환"""
@@ -93,14 +121,15 @@ class LeonardoImageGenerator:
 
         payload = {
             "prompt": prompt,
+            "negative_prompt": NEGATIVE_PROMPT,
             "modelId": self.model_id,
             "width": width,
             "height": height,
             "num_images": num_images,
-            "promptMagic": prompt_magic,
             "guidance_scale": guidance_scale,
             "presetStyle": "CINEMATIC",  # 영상에 적합한 시네마틱 스타일
-            "public": False
+            "public": False,
+            "promptMagic": False,  # 스타일 프리셋 사용으로 비활성화
         }
 
         async with aiohttp.ClientSession() as session:
@@ -147,6 +176,105 @@ class LeonardoImageGenerator:
 
         raise TimeoutError(f"이미지 생성 시간 초과 (generation_id: {generation_id})")
 
+    async def generate_and_save(
+        self,
+        prompt: str,
+        output_path: str,
+        width: int = 1344,
+        height: int = 768,
+        apply_style: bool = True
+    ) -> str:
+        """
+        이미지 생성 후 파일로 저장
+
+        Args:
+            prompt: 이미지 프롬프트 (영문)
+            output_path: 저장할 파일 경로
+            width: 이미지 너비
+            height: 이미지 높이
+            apply_style: 스타일 프리셋 적용 여부
+
+        Returns:
+            저장된 파일 경로
+        """
+        # 이미지 URL 생성
+        image_url = await self.generate_image(
+            prompt, width, height,
+            apply_style=apply_style
+        )
+
+        # 이미지 다운로드 및 저장
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as response:
+                if response.status != 200:
+                    raise Exception(f"이미지 다운로드 실패: {response.status}")
+
+                image_data = await response.read()
+
+                # 디렉토리 생성
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+                with open(output_path, "wb") as f:
+                    f.write(image_data)
+
+        return output_path
+
+    async def generate_images_for_sentences(
+        self,
+        sentences: List[str],
+        prompts: List[str],
+        output_dir: str,
+        width: int = 1344,
+        height: int = 768,
+        progress_callback=None
+    ) -> List[str]:
+        """
+        문장별 이미지 생성 (Asset Kit용)
+
+        Args:
+            sentences: 원본 문장 리스트
+            prompts: 영문 이미지 프롬프트 리스트
+            output_dir: 저장 디렉토리
+            width: 이미지 너비
+            height: 이미지 높이
+            progress_callback: 진행 상황 콜백 함수
+
+        Returns:
+            저장된 이미지 파일 경로 리스트
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+        paths = []
+        total = len(prompts)
+
+        # 순차 생성 (API 레이트 리밋 고려)
+        for i, prompt in enumerate(prompts):
+            output_path = os.path.join(output_dir, f"{i+1:03d}_image.png")
+
+            if progress_callback:
+                progress_callback(f"문장 {i+1}/{total} 이미지 생성 중...")
+
+            try:
+                path = await self.generate_and_save(
+                    prompt=prompt,
+                    output_path=output_path,
+                    width=width,
+                    height=height,
+                    apply_style=True
+                )
+                paths.append(path)
+                print(f"  [완료] {i+1:03d}_image.png")
+
+            except Exception as e:
+                print(f"  [오류] 문장 {i+1} 이미지 생성 실패: {e}")
+                paths.append(None)
+
+            # API 레이트 리밋 방지
+            if i < total - 1:
+                await asyncio.sleep(1)
+
+        return paths
+
     async def generate_images_for_scenes(
         self,
         scenes: List[Scene],
@@ -170,7 +298,7 @@ class LeonardoImageGenerator:
 
         # 병렬 생성을 위한 태스크 생성
         tasks = [
-            self._generate_and_save(
+            self.generate_and_save(
                 scene.image_prompt_english,
                 os.path.join(output_dir, f"scene_{i:02d}_{scene.section_title}.png"),
                 width,
@@ -202,31 +330,10 @@ class LeonardoImageGenerator:
 
         return paths
 
-    async def _generate_and_save(
-        self,
-        prompt: str,
-        output_path: str,
-        width: int = 1344,
-        height: int = 768
-    ) -> str:
-        """이미지 생성 후 파일로 저장"""
-        # 이미지 URL 생성
-        image_url = await self.generate_image(prompt, width, height)
 
-        # 이미지 다운로드 및 저장
-        async with aiohttp.ClientSession() as session:
-            async with session.get(image_url) as response:
-                if response.status != 200:
-                    raise Exception(f"이미지 다운로드 실패: {response.status}")
-
-                image_data = await response.read()
-                with open(output_path, "wb") as f:
-                    f.write(image_data)
-
-        return output_path
-
-
+# ============================================================
 # 편의 함수들
+# ============================================================
 
 async def generate_scene_images(
     scenes: List[Scene],
@@ -255,7 +362,8 @@ async def generate_single_image(
     api_key: Optional[str] = None,
     model_id: Optional[str] = None,
     width: int = 1344,
-    height: int = 768
+    height: int = 768,
+    apply_style: bool = True
 ) -> str:
     """
     단일 이미지 URL 생성
@@ -264,4 +372,4 @@ async def generate_single_image(
         str: 생성된 이미지 URL
     """
     generator = LeonardoImageGenerator(api_key, model_id)
-    return await generator.generate_image(prompt, width, height)
+    return await generator.generate_image(prompt, width, height, apply_style=apply_style)
