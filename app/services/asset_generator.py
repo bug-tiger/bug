@@ -39,6 +39,16 @@ class AssetKitGenerator:
         self.elevenlabs_key = elevenlabs_api_key or settings.ELEVENLABS_API_KEY
         self.elevenlabs_voice_id = elevenlabs_voice_id or settings.ELEVENLABS_VOICE_ID
 
+        # API 키 검증
+        print(f"[설정 확인]")
+        print(f"  - ANTHROPIC_API_KEY: {'설정됨' if self.anthropic_key else '없음'}")
+        print(f"  - LEONARDO_API_KEY: {'설정됨' if self.leonardo_key else '없음'}")
+        print(f"  - ELEVENLABS_API_KEY: {'설정됨' if self.elevenlabs_key else '없음'}")
+        print(f"  - ELEVENLABS_VOICE_ID: {self.elevenlabs_voice_id or '없음'}")
+
+        if not self.anthropic_key:
+            raise ValueError("ANTHROPIC_API_KEY가 .env 파일에 설정되지 않았습니다.")
+
         # Anthropic 클라이언트 (문장 -> 영문 프롬프트 변환용)
         self.anthropic_client = anthropic.AsyncAnthropic(api_key=self.anthropic_key)
 
@@ -103,30 +113,51 @@ class AssetKitGenerator:
         report("프롬프트 생성 완료", 30)
 
         # 5. 이미지 생성
-        report("이미지 생성 시작...", 35)
-        image_paths = await self._generate_images(
-            sentences, prompts, output_dir,
-            lambda msg: report(msg, 35 + int(40 * (prompts.index(msg.split()[-1]) if msg.split() else 0) / max(len(prompts), 1)))
-        )
+        image_paths = []
+        success_count = 0
 
-        success_count = sum(1 for p in image_paths if p is not None)
-        report(f"이미지 생성 완료: {success_count}/{total_sentences}", 75)
+        if self.leonardo_key:
+            report("이미지 생성 시작...", 35)
+            try:
+                image_paths = await self._generate_images(
+                    sentences, prompts, output_dir,
+                    lambda msg: report(msg, 35 + int(40 * len([p for p in image_paths if p]) / max(len(prompts), 1)))
+                )
+                success_count = sum(1 for p in image_paths if p is not None)
+                report(f"이미지 생성 완료: {success_count}/{total_sentences}", 75)
+            except Exception as e:
+                print(f"[오류] 이미지 생성 실패: {e}")
+                import traceback
+                print(traceback.format_exc())
+                report(f"이미지 생성 실패: {str(e)[:100]}", 75)
+        else:
+            report("LEONARDO_API_KEY 없음 - 이미지 생성 건너뜀", 75)
+            print("[경고] LEONARDO_API_KEY가 설정되지 않아 이미지 생성을 건너뜁니다.")
 
         # 6. TTS 오디오 생성
-        report("오디오 생성 중...", 80)
-        audio_path = os.path.join(output_dir, "000_full_audio.mp3")
+        audio_path = None
 
-        try:
-            await generate_audio_chunked(
-                text=clean_text,
-                output_path=audio_path,
-                voice=self.elevenlabs_voice_id or "Lily",
-                api_key=self.elevenlabs_key
-            )
-            report("오디오 생성 완료", 95)
-        except Exception as e:
-            report(f"오디오 생성 실패: {e}", 95)
-            audio_path = None
+        if self.elevenlabs_key:
+            report("오디오 생성 중...", 80)
+            audio_path = os.path.join(output_dir, "000_full_audio.mp3")
+
+            try:
+                await generate_audio_chunked(
+                    text=clean_text,
+                    output_path=audio_path,
+                    voice=self.elevenlabs_voice_id or "Lily",
+                    api_key=self.elevenlabs_key
+                )
+                report("오디오 생성 완료", 95)
+            except Exception as e:
+                print(f"[오류] 오디오 생성 실패: {e}")
+                import traceback
+                print(traceback.format_exc())
+                report(f"오디오 생성 실패: {str(e)[:100]}", 95)
+                audio_path = None
+        else:
+            report("ELEVENLABS_API_KEY 없음 - 오디오 생성 건너뜀", 95)
+            print("[경고] ELEVENLABS_API_KEY가 설정되지 않아 오디오 생성을 건너뜁니다.")
 
         # 7. 결과 요약
         report("Asset Kit 생성 완료!", 100)
