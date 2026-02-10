@@ -22,31 +22,35 @@ from app.schemas.script import Scene
 
 
 # ============================================================
-# 스타일 프리셋 (의학 콘텐츠 신뢰도 향상을 위한 일관된 화풍)
+# 스타일 프리셋 (K-MINIATURE DIORAMA 스타일)
 # ============================================================
 
 STYLE_PREFIX = (
-    "Photorealistic medical imagery, cinematic lighting, 8k resolution, "
-    "clean composition, professional and trustworthy atmosphere, highly detailed, "
+    "A hyper-realistic miniature diorama of "
+)
+
+STYLE_SUFFIX = (
+    ", tilt-shift photography, macro lens, bokeh effect, "
+    "isometric view, warm golden lighting, cute and detailed"
 )
 
 NEGATIVE_PROMPT = (
-    "text, watermark, ugly, deformed, cartoon, illustration, sketching, "
-    "horror, blood, gore, blurry, low quality, bad anatomy"
+    "text, watermark, ugly, deformed, blurry, low quality, "
+    "realistic human size, normal scale, flat lighting"
 )
 
 
 def build_styled_prompt(content_prompt: str) -> str:
     """
-    스타일 프리셋을 적용한 최종 프롬프트 생성
+    K-MINIATURE DIORAMA 스타일 프리셋을 적용한 최종 프롬프트 생성
 
     Args:
-        content_prompt: 콘텐츠 설명 (영문)
+        content_prompt: 콘텐츠 설명 (영문) - 미니어처 디오라마 장면 묘사
 
     Returns:
         스타일이 적용된 최종 프롬프트
     """
-    return f"{STYLE_PREFIX}{content_prompt}"
+    return f"{STYLE_PREFIX}{content_prompt}{STYLE_SUFFIX}"
 
 
 class LeonardoImageGenerator:

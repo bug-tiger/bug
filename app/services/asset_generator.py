@@ -197,29 +197,46 @@ class AssetKitGenerator:
                 prompts.append(prompt)
             except Exception as e:
                 print(f"  [오류] 프롬프트 생성 실패: {e}")
-                # 기본 프롬프트 사용
-                prompts.append("A professional medical scene in a modern hospital setting")
+                # 기본 프롬프트 사용 (K-MINIATURE DIORAMA 스타일)
+                prompts.append("tiny doctors in white coats examining a GIANT MEDICAL MODEL")
 
         return prompts
 
     async def _translate_to_image_prompt(self, korean_sentence: str) -> str:
         """
-        한글 문장을 영문 이미지 프롬프트로 변환 (Anthropic Claude 사용)
+        한글 문장을 K-MINIATURE DIORAMA 스타일 영문 이미지 프롬프트로 변환
         """
         message = await self.anthropic_client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=200,
+            max_tokens=300,
             messages=[
                 {
                     "role": "user",
-                    "content": f"""다음 한글 문장의 핵심 내용을 영어 이미지 프롬프트로 변환해주세요.
-의학/건강 콘텐츠에 적합한 시각적 묘사로 작성해주세요.
-카메라 앵글, 조명, 분위기를 포함하면 좋습니다.
-프롬프트만 출력하세요 (설명 없이).
+                    "content": f"""[K-MINIATURE DIORAMA 스타일 프롬프트 생성]
 
-문장: {korean_sentence}
+다음 한글 문장을 미니어처 디오라마 장면으로 변환해주세요.
 
-영어 이미지 프롬프트:"""
+## 필수 규칙:
+1. 사람은 반드시 "tiny figurines" (작은 피규어)로 묘사
+2. 의학 주제(무릎, 멍, 신체부위)나 농작물은 "GIANT, oversized prop" (거대한 소품)으로 중앙 배치
+3. 의료진: "tiny doctors in white coats"
+4. 일반인: "tiny people in Korean traditional work clothes"
+
+## 출력 형식:
+"A hyper-realistic miniature diorama of..." 로 시작하지 마세요.
+장면 묘사만 출력하세요 (스타일 접미사는 시스템이 자동 추가함).
+
+## 예시:
+입력: "정강이 멍 치료"
+출력: "tiny doctors using a small polishing machine on a GIANT BRUISED LEG MODEL, warm sunlight"
+
+입력: "무릎 관절 검사"
+출력: "tiny doctors examining a GIANT KNEE JOINT MODEL with miniature medical tools"
+
+## 변환할 문장:
+{korean_sentence}
+
+출력:"""
                 }
             ]
         )
