@@ -243,15 +243,55 @@ class AssetKitGenerator:
 
         return message.content[0].text.strip()
 
+    async def _translate_to_infographic_prompt(self, korean_sentence: str) -> str:
+        """
+        한글 문장을 MEDICAL INFOGRAPHIC 스타일 영문 프롬프트로 변환
+        """
+        message = await self.anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=300,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"""[MEDICAL INFOGRAPHIC 스타일 프롬프트 생성]
+
+다음 한글 문장을 의료 인포그래픽 다이어그램으로 변환해주세요.
+
+## 필수 규칙:
+1. 의학적 원리나 단계를 시각적으로 설명
+2. Step 1 -> Step 2 -> Step 3 형식의 진행 과정
+3. 영문 라벨과 숫자만 사용 (한글 절대 금지)
+4. 해부학적 구조나 의료 도구를 도식화
+
+## 출력 형식:
+스타일 접두사/접미사 없이 장면 묘사만 출력.
+
+## 예시:
+입력: "무릎 인공관절 수술 과정"
+출력: "three-step knee replacement surgery diagram, Step 1: damaged joint removal, Step 2: implant placement, Step 3: final alignment, labeled anatomy"
+
+입력: "혈압 측정 방법"
+출력: "blood pressure measurement infographic, arm positioning diagram, cuff placement guide, reading interpretation chart with numbers"
+
+## 변환할 문장:
+{korean_sentence}
+
+출력:"""
+                }
+            ]
+        )
+
+        return message.content[0].text.strip()
+
     async def _generate_images(
         self,
         sentences: List[str],
-        prompts: List[str],
+        prompts_mini: List[str],
         output_dir: str,
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> List[Optional[str]]:
         """
-        이미지 생성 및 저장
+        이미지 생성 및 저장 (문장당 2개: 미니어처 + 인포그래픽)
 
         Returns:
             저장된 이미지 경로 리스트 (실패시 None)
@@ -259,33 +299,53 @@ class AssetKitGenerator:
         generator = LeonardoImageGenerator(api_key=self.leonardo_key)
 
         paths = []
-        total = len(prompts)
+        total = len(prompts_mini)
 
-        for i, prompt in enumerate(prompts):
-            output_path = os.path.join(output_dir, f"{i+1:03d}_image.png")
+        for i, prompt_mini in enumerate(prompts_mini):
             print(f"  문장 {i+1}/{total} 이미지 생성 중...")
 
             if progress_callback:
                 progress_callback(f"문장 {i+1}/{total} 이미지 생성 중...")
 
+            # 1. 미니어처 스타일 이미지 생성
+            output_path_mini = os.path.join(output_dir, f"{i+1:03d}_mini.png")
             try:
                 path = await generator.generate_and_save(
-                    prompt=prompt,
-                    output_path=output_path,
+                    prompt=prompt_mini,
+                    output_path=output_path_mini,
                     width=1344,
                     height=768,
-                    apply_style=True
+                    apply_style=True,
+                    style="mini"
                 )
                 paths.append(path)
-                print(f"  [완료] {i+1:03d}_image.png")
-
+                print(f"    [완료] {i+1:03d}_mini.png")
             except Exception as e:
-                print(f"  [오류] 문장 {i+1} 이미지 생성 실패: {e}")
+                print(f"    [오류] 미니어처 이미지 생성 실패: {e}")
                 paths.append(None)
 
             # API 레이트 리밋 방지
-            if i < total - 1:
-                await asyncio.sleep(2)
+            await asyncio.sleep(2)
+
+            # 2. 인포그래픽 스타일 이미지 생성
+            output_path_info = os.path.join(output_dir, f"{i+1:03d}_info.png")
+            try:
+                # 인포그래픽용 프롬프트 생성
+                prompt_info = await self._translate_to_infographic_prompt(sentences[i])
+
+                path = await generator.generate_and_save(
+                    prompt=prompt_info,
+                    output_path=output_path_info,
+                    width=1344,
+                    height=768,
+                    apply_style=True,
+                    style="info"
+                )
+                paths.append(path)
+                print(f"    [완료] {i+1:03d}_info.png")
+            except Exception as e:
+                print(f"    [오류] 인포그래픽 이미지 생성 실패: {e}")
+                paths.append(None)
 
         return paths
 

@@ -22,35 +22,67 @@ from app.schemas.script import Scene
 
 
 # ============================================================
-# 스타일 프리셋 (K-MINIATURE DIORAMA 스타일)
+# 스타일 프리셋 1: K-MINIATURE DIORAMA (미니어처 디오라마)
 # ============================================================
 
-STYLE_PREFIX = (
+STYLE_MINI_PREFIX = (
     "A hyper-realistic miniature diorama of "
 )
 
-STYLE_SUFFIX = (
+STYLE_MINI_SUFFIX = (
     ", tilt-shift photography, macro lens, bokeh effect, "
     "isometric view, warm golden lighting, cute and detailed"
 )
 
-NEGATIVE_PROMPT = (
+NEGATIVE_PROMPT_MINI = (
     "text, watermark, ugly, deformed, blurry, low quality, "
     "realistic human size, normal scale, flat lighting"
 )
 
+# ============================================================
+# 스타일 프리셋 2: MEDICAL INFOGRAPHIC (의료 인포그래픽)
+# ============================================================
 
-def build_styled_prompt(content_prompt: str) -> str:
+STYLE_INFO_PREFIX = (
+    "Clean medical infographic illustration, "
+)
+
+STYLE_INFO_SUFFIX = (
+    ", minimalist flat vector style, thick outlines, "
+    "blue and beige color palette, professional medical diagram, "
+    "horizontal layout with 3 sections, step by step visualization, "
+    "ENGLISH TEXT AND NUMBERS ONLY, no Korean characters"
+)
+
+NEGATIVE_PROMPT_INFO = (
+    "Korean text, Hangul, Asian characters, realistic photo, "
+    "3D render, complex shadows, dark colors, cluttered"
+)
+
+
+def build_styled_prompt(content_prompt: str, style: str = "mini") -> str:
     """
-    K-MINIATURE DIORAMA 스타일 프리셋을 적용한 최종 프롬프트 생성
+    스타일 프리셋을 적용한 최종 프롬프트 생성
 
     Args:
-        content_prompt: 콘텐츠 설명 (영문) - 미니어처 디오라마 장면 묘사
+        content_prompt: 콘텐츠 설명 (영문)
+        style: "mini" (미니어처) 또는 "info" (인포그래픽)
 
     Returns:
         스타일이 적용된 최종 프롬프트
     """
-    return f"{STYLE_PREFIX}{content_prompt}{STYLE_SUFFIX}"
+    if style == "info":
+        return f"{STYLE_INFO_PREFIX}{content_prompt}{STYLE_INFO_SUFFIX}"
+    else:
+        return f"{STYLE_MINI_PREFIX}{content_prompt}{STYLE_MINI_SUFFIX}"
+
+
+def get_negative_prompt(style: str = "mini") -> str:
+    """스타일에 맞는 네거티브 프롬프트 반환"""
+    if style == "info":
+        return NEGATIVE_PROMPT_INFO
+    else:
+        return NEGATIVE_PROMPT_MINI
 
 
 class LeonardoImageGenerator:
@@ -79,6 +111,7 @@ class LeonardoImageGenerator:
         height: int = 768,
         num_images: int = 1,
         apply_style: bool = True,
+        style: str = "mini",  # "mini" 또는 "info"
         guidance_scale: float = 7.0
     ) -> str:
         """
@@ -90,13 +123,14 @@ class LeonardoImageGenerator:
             height: 이미지 높이 (기본 768)
             num_images: 생성할 이미지 수 (기본 1)
             apply_style: 스타일 프리셋 적용 여부 (기본 True)
+            style: 스타일 종류 - "mini" (미니어처) 또는 "info" (인포그래픽)
             guidance_scale: 프롬프트 충실도 (기본 7.0)
 
         Returns:
             str: 생성된 이미지 URL
         """
         # 스타일 적용
-        final_prompt = build_styled_prompt(prompt) if apply_style else prompt
+        final_prompt = build_styled_prompt(prompt, style) if apply_style else prompt
 
         # 1. 이미지 생성 요청
         generation_id = await self._request_generation(
@@ -104,7 +138,8 @@ class LeonardoImageGenerator:
             width=width,
             height=height,
             num_images=num_images,
-            guidance_scale=guidance_scale
+            guidance_scale=guidance_scale,
+            style=style
         )
 
         # 2. 생성 완료까지 폴링
@@ -118,14 +153,15 @@ class LeonardoImageGenerator:
         width: int,
         height: int,
         num_images: int,
-        guidance_scale: float
+        guidance_scale: float,
+        style: str = "mini"
     ) -> str:
         """이미지 생성 요청 후 generation_id 반환"""
         url = f"{self.BASE_URL}/generations"
 
         payload = {
             "prompt": prompt,
-            "negative_prompt": NEGATIVE_PROMPT,
+            "negative_prompt": get_negative_prompt(style),
             "modelId": self.model_id,
             "width": width,
             "height": height,
@@ -186,7 +222,8 @@ class LeonardoImageGenerator:
         output_path: str,
         width: int = 1344,
         height: int = 768,
-        apply_style: bool = True
+        apply_style: bool = True,
+        style: str = "mini"
     ) -> str:
         """
         이미지 생성 후 파일로 저장
@@ -197,6 +234,7 @@ class LeonardoImageGenerator:
             width: 이미지 너비
             height: 이미지 높이
             apply_style: 스타일 프리셋 적용 여부
+            style: 스타일 종류 - "mini" 또는 "info"
 
         Returns:
             저장된 파일 경로
@@ -204,7 +242,8 @@ class LeonardoImageGenerator:
         # 이미지 URL 생성
         image_url = await self.generate_image(
             prompt, width, height,
-            apply_style=apply_style
+            apply_style=apply_style,
+            style=style
         )
 
         # 이미지 다운로드 및 저장
