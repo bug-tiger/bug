@@ -212,36 +212,35 @@ class AssetKitGenerator:
             messages=[
                 {
                     "role": "user",
-                    "content": f"""[K-MINIATURE DIORAMA 스타일 프롬프트 생성]
+                    "content": f"""당신은 이미지 프롬프트 생성 전문가입니다.
+아래 한글 문장을 영어 이미지 프롬프트로 변환하세요.
 
-다음 한글 문장을 미니어처 디오라마 장면으로 변환해주세요.
+[스타일: K-MINIATURE DIORAMA]
+- 사람: "tiny figurines" (작은 피규어)
+- 의학 주제/신체부위: "GIANT, oversized prop" (거대한 소품)
+- 의료진: "tiny doctors in white coats"
+- 일반인: "tiny people in Korean traditional work clothes"
 
-## 필수 규칙:
-1. 사람은 반드시 "tiny figurines" (작은 피규어)로 묘사
-2. 의학 주제(무릎, 멍, 신체부위)나 농작물은 "GIANT, oversized prop" (거대한 소품)으로 중앙 배치
-3. 의료진: "tiny doctors in white coats"
-4. 일반인: "tiny people in Korean traditional work clothes"
+[중요]
+- 반드시 영어로 된 장면 묘사만 출력하세요
+- 설명이나 질문 없이 프롬프트만 출력하세요
+- 입력이 이상하더라도 최대한 해석해서 프롬프트를 생성하세요
 
-## 출력 형식:
-"A hyper-realistic miniature diorama of..." 로 시작하지 마세요.
-장면 묘사만 출력하세요 (스타일 접미사는 시스템이 자동 추가함).
-
-## 예시:
-입력: "정강이 멍 치료"
-출력: "tiny doctors using a small polishing machine on a GIANT BRUISED LEG MODEL, warm sunlight"
-
-입력: "무릎 관절 검사"
-출력: "tiny doctors examining a GIANT KNEE JOINT MODEL with miniature medical tools"
-
-## 변환할 문장:
+[입력 문장]
 {korean_sentence}
 
-출력:"""
+[영어 프롬프트]"""
                 }
             ]
         )
 
-        return message.content[0].text.strip()
+        result = message.content[0].text.strip()
+
+        # 결과가 한글이거나 질문 형태면 기본 프롬프트 반환
+        if any(word in result for word in ['입력', '문장', '예를 들어', '해주세요', '변환']):
+            return "tiny doctors in white coats examining medical equipment in a miniature hospital setting"
+
+        return result
 
     async def _translate_to_infographic_prompt(self, korean_sentence: str) -> str:
         """
