@@ -106,10 +106,12 @@ class AssetKitGenerator:
         # 프롬프트 저장
         prompts_path = os.path.join(output_dir, "000_prompts.txt")
         with open(prompts_path, "w", encoding="utf-8") as f:
-            for i, (sentence, prompt) in enumerate(zip(sentences, prompts), 1):
+            for i, (sentence, prompt_dict) in enumerate(zip(sentences, prompts), 1):
                 f.write(f"--- {i:03d} ---\n")
                 f.write(f"원문: {sentence}\n")
-                f.write(f"프롬프트: {prompt}\n\n")
+                f.write(f"miniature : {prompt_dict.get('prompt_miniature', '')}\n")
+                f.write(f"infographic: {prompt_dict.get('prompt_infographic', '')}\n")
+                f.write(f"napkin     : {prompt_dict.get('prompt_napkin', '')}\n\n")
         report("프롬프트 생성 완료", 30)
 
         # 5. 이미지 생성
@@ -121,7 +123,7 @@ class AssetKitGenerator:
             try:
                 image_paths = await self._generate_images(
                     sentences, prompts, output_dir,
-                    lambda msg: report(msg, 35 + int(40 * len([p for p in image_paths if p]) / max(len(prompts), 1)))
+                    lambda msg: report(msg, 35)
                 )
                 success_count = sum(1 for p in image_paths if p is not None)
                 report(f"이미지 생성 완료: {success_count}/{total_sentences}", 75)
@@ -177,15 +179,12 @@ class AssetKitGenerator:
             }
         }
 
-    async def _generate_image_prompts(self, sentences: List[str]) -> List[str]:
+    async def _generate_image_prompts(self, sentences: List[str]) -> List[dict]:
         """
-        문장 리스트를 영문 이미지 프롬프트로 변환
-
-        Args:
-            sentences: 한글 문장 리스트
+        문장 리스트를 3종 스타일 영문 이미지 프롬프트로 변환
 
         Returns:
-            영문 프롬프트 리스트
+            각 문장별 {"prompt_miniature", "prompt_infographic", "prompt_napkin"} dict 리스트
         """
         prompts = []
 
@@ -193,104 +192,89 @@ class AssetKitGenerator:
             print(f"  프롬프트 생성 중: {i+1}/{len(sentences)}")
 
             try:
-                prompt = await self._translate_to_image_prompt(sentence)
-                prompts.append(prompt)
+                prompt_dict = await self._generate_all_style_prompts(sentence)
+                prompts.append(prompt_dict)
             except Exception as e:
                 print(f"  [오류] 프롬프트 생성 실패: {e}")
-                # 기본 프롬프트 사용 (K-MINIATURE DIORAMA 스타일)
-                prompts.append("tiny doctors in white coats examining a GIANT MEDICAL MODEL")
+                prompts.append({
+                    "prompt_miniature": "tiny doctors in white coats examining a GIANT MEDICAL MODEL",
+                    "prompt_infographic": "three-step medical procedure diagram with labeled anatomy",
+                    "prompt_napkin": "simple sketch of medical concept with arrows and labels"
+                })
 
         return prompts
 
-    async def _translate_to_image_prompt(self, korean_sentence: str) -> str:
+    async def _generate_all_style_prompts(self, korean_sentence: str) -> dict:
         """
-        한글 문장을 K-MINIATURE DIORAMA 스타일 영문 이미지 프롬프트로 변환
+        한글 문장을 3종 스타일 영문 프롬프트 JSON으로 변환 (단일 API 호출)
         """
         message = await self.anthropic_client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=300,
+            max_tokens=600,
             messages=[
                 {
                     "role": "user",
                     "content": f"""당신은 이미지 프롬프트 생성 전문가입니다.
-아래 한글 문장을 영어 이미지 프롬프트로 변환하세요.
+아래 한글 문장을 3가지 스타일의 영어 이미지 프롬프트로 변환하세요.
+입력이 이상하더라도 반드시 JSON만 출력하고 설명은 생략하세요.
 
-[스타일: K-MINIATURE DIORAMA]
-- 사람: "tiny figurines" (작은 피규어)
-- 의학 주제/신체부위: "GIANT, oversized prop" (거대한 소품)
-- 의료진: "tiny doctors in white coats"
-- 일반인: "tiny people in Korean traditional work clothes"
+[스타일 규칙]
+1. prompt_miniature (K-MINIATURE DIORAMA):
+   - 사람: "tiny figurines", 의료진: "tiny doctors in white coats"
+   - 의학 주제/신체: "GIANT oversized prop"
 
-[중요]
-- 반드시 영어로 된 장면 묘사만 출력하세요
-- 설명이나 질문 없이 프롬프트만 출력하세요
-- 입력이 이상하더라도 최대한 해석해서 프롬프트를 생성하세요
+2. prompt_infographic (MEDICAL INFOGRAPHIC):
+   - Step 1 → Step 2 → Step 3 진행 과정 다이어그램
+   - 영문 라벨과 숫자만 사용
+
+3. prompt_napkin (NAPKIN SKETCH):
+   - 손그림 스케치 스타일로 개념 설명
+   - 화살표, 동그라미, 간단한 영문 텍스트
+
+[출력 형식 - JSON만 출력]
+{{"prompt_miniature": "...", "prompt_infographic": "...", "prompt_napkin": "..."}}
 
 [입력 문장]
-{korean_sentence}
-
-[영어 프롬프트]"""
+{korean_sentence}"""
                 }
             ]
         )
 
-        result = message.content[0].text.strip()
+        import json
+        import re
+        raw = message.content[0].text.strip()
 
-        # 결과가 한글이거나 질문 형태면 기본 프롬프트 반환
-        if any(word in result for word in ['입력', '문장', '예를 들어', '해주세요', '변환']):
-            return "tiny doctors in white coats examining medical equipment in a miniature hospital setting"
-
-        return result
-
-    async def _translate_to_infographic_prompt(self, korean_sentence: str) -> str:
-        """
-        한글 문장을 MEDICAL INFOGRAPHIC 스타일 영문 프롬프트로 변환
-        """
-        message = await self.anthropic_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=300,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"""[MEDICAL INFOGRAPHIC 스타일 프롬프트 생성]
-
-다음 한글 문장을 의료 인포그래픽 다이어그램으로 변환해주세요.
-
-## 필수 규칙:
-1. 의학적 원리나 단계를 시각적으로 설명
-2. Step 1 -> Step 2 -> Step 3 형식의 진행 과정
-3. 영문 라벨과 숫자만 사용 (한글 절대 금지)
-4. 해부학적 구조나 의료 도구를 도식화
-
-## 출력 형식:
-스타일 접두사/접미사 없이 장면 묘사만 출력.
-
-## 예시:
-입력: "무릎 인공관절 수술 과정"
-출력: "three-step knee replacement surgery diagram, Step 1: damaged joint removal, Step 2: implant placement, Step 3: final alignment, labeled anatomy"
-
-입력: "혈압 측정 방법"
-출력: "blood pressure measurement infographic, arm positioning diagram, cuff placement guide, reading interpretation chart with numbers"
-
-## 변환할 문장:
-{korean_sentence}
-
-출력:"""
-                }
-            ]
-        )
-
-        return message.content[0].text.strip()
+        # JSON 파싱 시도
+        try:
+            # 코드블록 제거
+            raw = re.sub(r"```(?:json)?", "", raw).strip().rstrip("`").strip()
+            result = json.loads(raw)
+            # 한글 폴백 검사
+            fallback_keys = ['입력', '문장', '해주세요', '변환']
+            for key in ["prompt_miniature", "prompt_infographic", "prompt_napkin"]:
+                if key not in result or any(w in result.get(key, "") for w in fallback_keys):
+                    result[key] = {
+                        "prompt_miniature": "tiny doctors examining a GIANT anatomical model",
+                        "prompt_infographic": "three-step medical procedure diagram with labels",
+                        "prompt_napkin": "simple sketch of medical concept with arrows"
+                    }[key]
+            return result
+        except Exception:
+            return {
+                "prompt_miniature": "tiny doctors in white coats examining medical equipment",
+                "prompt_infographic": "three-step medical procedure diagram with labeled anatomy",
+                "prompt_napkin": "simple sketch of medical concept with arrows and labels"
+            }
 
     async def _generate_images(
         self,
         sentences: List[str],
-        prompts_mini: List[str],
+        prompts: List[dict],
         output_dir: str,
         progress_callback: Optional[Callable[[str], None]] = None
     ) -> List[Optional[str]]:
         """
-        이미지 생성 및 저장 (문장당 2개: 미니어처 + 인포그래픽)
+        이미지 생성 및 저장 (문장당 3개: 미니어처 + 인포그래픽 + 나프킨)
 
         Returns:
             저장된 이미지 경로 리스트 (실패시 None)
@@ -298,53 +282,39 @@ class AssetKitGenerator:
         generator = LeonardoImageGenerator(api_key=self.leonardo_key)
 
         paths = []
-        total = len(prompts_mini)
+        total = len(prompts)
 
-        for i, prompt_mini in enumerate(prompts_mini):
+        for i, prompt_dict in enumerate(prompts):
             print(f"  문장 {i+1}/{total} 이미지 생성 중...")
 
             if progress_callback:
                 progress_callback(f"문장 {i+1}/{total} 이미지 생성 중...")
 
-            # 1. 미니어처 스타일 이미지 생성
-            output_path_mini = os.path.join(output_dir, f"{i+1:03d}_mini.png")
-            try:
-                path = await generator.generate_and_save(
-                    prompt=prompt_mini,
-                    output_path=output_path_mini,
-                    width=1344,
-                    height=768,
-                    apply_style=True,
-                    style="mini"
-                )
-                paths.append(path)
-                print(f"    [완료] {i+1:03d}_mini.png")
-            except Exception as e:
-                print(f"    [오류] 미니어처 이미지 생성 실패: {e}")
-                paths.append(None)
+            for style, suffix in [
+                ("mini",   "_mini.png"),
+                ("info",   "_info.png"),
+                ("napkin", "_napkin.png"),
+            ]:
+                key_map = {"mini": "prompt_miniature", "info": "prompt_infographic", "napkin": "prompt_napkin"}
+                prompt_text = prompt_dict.get(key_map[style], "")
+                output_path = os.path.join(output_dir, f"{i+1:03d}{suffix}")
+                try:
+                    path = await generator.generate_and_save(
+                        prompt=prompt_text,
+                        output_path=output_path,
+                        width=1344,
+                        height=768,
+                        apply_style=True,
+                        style=style
+                    )
+                    paths.append(path)
+                    print(f"    [완료] {i+1:03d}{suffix}")
+                except Exception as e:
+                    print(f"    [오류] {suffix} 이미지 생성 실패: {e}")
+                    paths.append(None)
 
-            # API 레이트 리밋 방지
-            await asyncio.sleep(2)
-
-            # 2. 인포그래픽 스타일 이미지 생성
-            output_path_info = os.path.join(output_dir, f"{i+1:03d}_info.png")
-            try:
-                # 인포그래픽용 프롬프트 생성
-                prompt_info = await self._translate_to_infographic_prompt(sentences[i])
-
-                path = await generator.generate_and_save(
-                    prompt=prompt_info,
-                    output_path=output_path_info,
-                    width=1344,
-                    height=768,
-                    apply_style=True,
-                    style="info"
-                )
-                paths.append(path)
-                print(f"    [완료] {i+1:03d}_info.png")
-            except Exception as e:
-                print(f"    [오류] 인포그래픽 이미지 생성 실패: {e}")
-                paths.append(None)
+                # API 레이트 리밋 방지
+                await asyncio.sleep(2)
 
         return paths
 

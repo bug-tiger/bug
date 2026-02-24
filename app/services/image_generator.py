@@ -59,6 +59,26 @@ NEGATIVE_PROMPT_INFO = (
     "3D render, complex shadows, dark colors, cluttered"
 )
 
+# ============================================================
+# 스타일 프리셋 3: NAPKIN SKETCH (손그림 스케치)
+# ============================================================
+
+STYLE_NAPKIN_PREFIX = (
+    "A simple black ink doodle on white paper, rough sketch, "
+    "hand-drawn marker style, "
+)
+
+STYLE_NAPKIN_SUFFIX = (
+    ", arrows and circles, minimalist concept art, "
+    "messy lines, hand-drawn look, black ink on white background, "
+    "napkin sketch style, minimal English text or symbols only"
+)
+
+NEGATIVE_PROMPT_NAPKIN = (
+    "Korean text, Hangul, Asian characters, color, realistic photo, "
+    "3D render, digital art, smooth lines, polished, watermark"
+)
+
 
 def build_styled_prompt(content_prompt: str, style: str = "mini") -> str:
     """
@@ -66,13 +86,15 @@ def build_styled_prompt(content_prompt: str, style: str = "mini") -> str:
 
     Args:
         content_prompt: 콘텐츠 설명 (영문)
-        style: "mini" (미니어처) 또는 "info" (인포그래픽)
+        style: "mini" | "info" | "napkin"
 
     Returns:
         스타일이 적용된 최종 프롬프트
     """
     if style == "info":
         return f"{STYLE_INFO_PREFIX}{content_prompt}{STYLE_INFO_SUFFIX}"
+    elif style == "napkin":
+        return f"{STYLE_NAPKIN_PREFIX}{content_prompt}{STYLE_NAPKIN_SUFFIX}"
     else:
         return f"{STYLE_MINI_PREFIX}{content_prompt}{STYLE_MINI_SUFFIX}"
 
@@ -81,6 +103,8 @@ def get_negative_prompt(style: str = "mini") -> str:
     """스타일에 맞는 네거티브 프롬프트 반환"""
     if style == "info":
         return NEGATIVE_PROMPT_INFO
+    elif style == "napkin":
+        return NEGATIVE_PROMPT_NAPKIN
     else:
         return NEGATIVE_PROMPT_MINI
 
